@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskManagement.Application.DTOs;
 using TaskManagement.Application.Interfaces;
@@ -9,6 +8,8 @@ namespace TaskManagement.API.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
+    private const string RefreshTokenCookie = "refreshToken";
+
     private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
 
@@ -18,9 +19,8 @@ public class AuthController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Authenticate and receive a JWT access token.</summary>
+    /// <summary>Authenticate and receive a JWT access token. Refresh token is set as an httpOnly cookie.</summary>
     [HttpPost("login")]
-    [AllowAnonymous]
     public async Task<ActionResult<AuthResponseDto>> Login([FromBody] LoginDto dto)
     {
         if (!ModelState.IsValid)
@@ -29,6 +29,8 @@ public class AuthController : ControllerBase
         try
         {
             var result = await _authService.LoginAsync(dto);
+            SetRefreshTokenCookie(result.RefreshToken);
+            result.RefreshToken = string.Empty;
             return Ok(result);
         }
         catch (UnauthorizedAccessException ex)
@@ -40,7 +42,6 @@ public class AuthController : ControllerBase
 
     /// <summary>Register a new user within an existing tenant.</summary>
     [HttpPost("register")]
-    [AllowAnonymous]
     public async Task<ActionResult<UserDto>> Register([FromBody] RegisterDto dto)
     {
         if (!ModelState.IsValid)
@@ -50,21 +51,54 @@ public class AuthController : ControllerBase
         return CreatedAtAction(nameof(Login), user);
     }
 
-    /// <summary>Refresh an expired access token using a valid refresh token.</summary>
+    /// <summary>Silently renew the access token using the httpOnly refresh token cookie.</summary>
     [HttpPost("refresh")]
-    [AllowAnonymous]
-    public async Task<ActionResult<AuthResponseDto>> Refresh([FromBody] RefreshTokenDto dto)
+    public async Task<ActionResult<AuthResponseDto>> Refresh()
     {
-        var result = await _authService.RefreshTokenAsync(dto.RefreshToken);
-        return Ok(result);
+        var refreshToken = Request.Cookies[RefreshTokenCookie];
+        if (string.IsNullOrEmpty(refreshToken))
+            return Unauthorized(new { error = "No refresh token provided." });
+
+        try
+        {
+            var result = await _authService.RefreshTokenAsync(refreshToken);
+            SetRefreshTokenCookie(result.RefreshToken);
+            result.RefreshToken = string.Empty;
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            ClearRefreshTokenCookie();
+            return Unauthorized(new { error = ex.Message });
+        }
     }
 
-    /// <summary>Invalidate a refresh token (logout).</summary>
+    /// <summary>Revoke the refresh token cookie and invalidate it in the database.</summary>
     [HttpPost("revoke")]
-    [Authorize]
-    public async Task<IActionResult> Revoke([FromBody] RefreshTokenDto dto)
+    public async Task<IActionResult> Revoke()
     {
-        await _authService.RevokeTokenAsync(dto.RefreshToken);
+        var refreshToken = Request.Cookies[RefreshTokenCookie];
+        if (!string.IsNullOrEmpty(refreshToken))
+            await _authService.RevokeTokenAsync(refreshToken);
+
+        ClearRefreshTokenCookie();
         return NoContent();
     }
+
+    private void SetRefreshTokenCookie(string token) =>
+        Response.Cookies.Append(RefreshTokenCookie, token, new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddDays(7),
+            Path = "/"
+        });
+
+    private void ClearRefreshTokenCookie() =>
+        Response.Cookies.Delete(RefreshTokenCookie, new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/"
+        });
 }

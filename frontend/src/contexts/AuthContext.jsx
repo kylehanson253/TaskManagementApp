@@ -16,19 +16,14 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const { data } = await authApi.login(email, password)
     localStorage.setItem('token', data.token)
-    localStorage.setItem('refreshToken', data.refreshToken)
     localStorage.setItem('user', JSON.stringify(data.user))
     setUser(data.user)
     return data.user
   }, [])
 
   const logout = useCallback(async () => {
-    const refreshToken = localStorage.getItem('refreshToken')
-    if (refreshToken) {
-      try { await authApi.revoke(refreshToken) } catch { /* ignore */ }
-    }
+    try { await authApi.revoke() } catch { /* ignore */ }
     localStorage.removeItem('token')
-    localStorage.removeItem('refreshToken')
     localStorage.removeItem('user')
     setUser(null)
   }, [])
