@@ -11,6 +11,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<User> Users => Set<User>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +65,27 @@ public class ApplicationDbContext : DbContext
             e.HasOne(t => t.CreatedBy)
              .WithMany(u => u.CreatedTasks)
              .HasForeignKey(t => t.CreatedByUserId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // RefreshToken
+        modelBuilder.Entity<RefreshToken>(e =>
+        {
+            e.HasKey(rt => rt.Id);
+            e.HasIndex(rt => rt.Token).IsUnique();
+            e.Property(rt => rt.Token).HasMaxLength(512).IsRequired();
+            e.Ignore(rt => rt.IsExpired);
+            e.Ignore(rt => rt.IsRevoked);
+            e.Ignore(rt => rt.IsActive);
+
+            e.HasOne(rt => rt.User)
+             .WithMany(u => u.RefreshTokens)
+             .HasForeignKey(rt => rt.UserId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(rt => rt.Tenant)
+             .WithMany()
+             .HasForeignKey(rt => rt.TenantId)
              .OnDelete(DeleteBehavior.Restrict);
         });
 

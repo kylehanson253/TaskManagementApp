@@ -109,6 +109,32 @@ Serilog is used for structured logging with Console and rolling-file sinks. All 
 
 ---
 
+
+### Optimized Queries and Stored Procedures
+Since the app uses SQLite, there are no stored proecedures
+
+GetTaskSummaryByTenantAsync in TaskRepository is the only query designed for efficiency:
+
+_context.Tasks
+    .Where(t => t.TenantId == tenantId)
+    .GroupBy(t => t.Status)
+    .Select(g => new { Status = g.Key, Count = g.Count() })
+    .ToListAsync();
+
+EF Core translates this to a single aggregated SQL query like:
+
+SELECT "Status", COUNT(*) AS "Count"
+FROM "Tasks"
+WHERE "TenantId" = @tenantId
+GROUP BY "Status"
+
+This avoids loading all task rows into memory just to count them — it lets the database do the aggregation work.
+
+Everything else — Standard EF Core LINQ
+
+---
+
+
 ## 3rd-Party Libraries
 
 | Library | Reason |

@@ -9,6 +9,7 @@ public class UnitOfWork : IUnitOfWork
     private TaskRepository? _taskRepository;
     private UserRepository? _userRepository;
     private TenantRepository? _tenantRepository;
+    private RefreshTokenRepository? _refreshTokenRepository;
 
     public UnitOfWork(ApplicationDbContext context)
     {
@@ -23,6 +24,9 @@ public class UnitOfWork : IUnitOfWork
 
     public ITenantRepository Tenants =>
         _tenantRepository ??= new TenantRepository(_context);
+
+    public IRefreshTokenRepository RefreshTokens =>
+        _refreshTokenRepository ??= new RefreshTokenRepository(_context);
 
     public async Task<int> SaveChangesAsync() =>
         await _context.SaveChangesAsync();

@@ -12,9 +12,6 @@ public class AuthService : IAuthService
     private readonly IJwtService _jwtService;
     private readonly ILogger<AuthService> _logger;
 
-    // In-memory refresh token store — in production use a DB-backed table.
-    private static readonly Dictionary<string, (int UserId, int TenantId, DateTime Expires)> _refreshTokens = new();
-
     public AuthService(IUnitOfWork unitOfWork, IJwtService jwtService, ILogger<AuthService> logger)
     {
         _unitOfWork = unitOfWork;
@@ -35,7 +32,7 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User {Email} (Tenant {TenantId}) logged in successfully.", user.Email, user.TenantId);
 
-        return BuildAuthResponse(user);
+        return await BuildAuthResponseAsync(user);
     }
 
     public async Task<UserDto> RegisterAsync(RegisterDto dto)
@@ -68,40 +65,50 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
     {
-        if (!_refreshTokens.TryGetValue(refreshToken, out var tokenData))
-            throw new UnauthorizedAccessException("Invalid or expired refresh token.");
+        var stored = await _unitOfWork.RefreshTokens.GetByTokenAsync(refreshToken)
+            ?? throw new UnauthorizedAccessException("Invalid or expired refresh token.");
 
-        if (tokenData.Expires < DateTime.UtcNow)
-        {
-            _refreshTokens.Remove(refreshToken);
-            throw new UnauthorizedAccessException("Refresh token has expired.");
-        }
+        if (!stored.IsActive)
+            throw new UnauthorizedAccessException("Refresh token has expired or been revoked.");
 
-        var user = await _unitOfWork.Users.GetByIdAsync(tokenData.UserId)
+        var user = await _unitOfWork.Users.GetByIdAsync(stored.UserId)
             ?? throw new UnauthorizedAccessException("User not found.");
 
-        _refreshTokens.Remove(refreshToken);
-        return BuildAuthResponse(user);
+        // Rotate: revoke the used token and issue a new one
+        stored.RevokedAt = DateTime.UtcNow;
+        await _unitOfWork.RefreshTokens.UpdateAsync(stored);
+        await _unitOfWork.SaveChangesAsync();
+
+        return await BuildAuthResponseAsync(user);
     }
 
-    public Task RevokeTokenAsync(string refreshToken)
+    public async Task RevokeTokenAsync(string refreshToken)
     {
-        _refreshTokens.Remove(refreshToken);
-        return Task.CompletedTask;
+        await _unitOfWork.RefreshTokens.RevokeTokenAsync(refreshToken);
     }
 
-    private AuthResponseDto BuildAuthResponse(User user)
+    private async Task<AuthResponseDto> BuildAuthResponseAsync(User user)
     {
         var accessToken = _jwtService.GenerateAccessToken(user);
-        var refreshToken = _jwtService.GenerateRefreshToken();
+        var rawRefreshToken = _jwtService.GenerateRefreshToken();
         var expiresAt = DateTime.UtcNow.AddHours(1);
 
-        _refreshTokens[refreshToken] = (user.Id, user.TenantId, DateTime.UtcNow.AddDays(7));
+        var tokenEntity = new RefreshToken
+        {
+            Token = rawRefreshToken,
+            UserId = user.Id,
+            TenantId = user.TenantId,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(7)
+        };
+
+        await _unitOfWork.RefreshTokens.AddAsync(tokenEntity);
+        await _unitOfWork.SaveChangesAsync();
 
         return new AuthResponseDto
         {
             Token = accessToken,
-            RefreshToken = refreshToken,
+            RefreshToken = rawRefreshToken,
             ExpiresAt = expiresAt,
             User = MapToUserDto(user, user.Tenant?.Name ?? string.Empty)
         };
