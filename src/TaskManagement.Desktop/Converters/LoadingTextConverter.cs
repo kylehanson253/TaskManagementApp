@@ -6,7 +6,7 @@ namespace TaskManagement.Desktop.Converters;
 public class LoadingTextConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is true ? "Signing in…" : "Sign In";
+        value is true ? "Logging in…" : "Login";
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotImplementedException();
