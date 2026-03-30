@@ -155,7 +155,6 @@ Everything else — Standard EF Core LINQ
 
 ## Known Limitations
 
-- Refresh tokens are stored in a static in-memory dictionary — they are lost on API restart and cannot be invalidated across multiple instances. In production, store them in a `RefreshTokens` DB table.
 - No email verification on registration.
 - The WPF app does not support task creation or editing (view + complete only) — this was intentional scope reduction for the companion app.
 - No pagination on the tasks list endpoint — acceptable for demo data volumes.
