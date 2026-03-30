@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Chrome (Frontend)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/src",
+      "sourceMapPathOverrides": {
+        "/@fs/*": "${workspaceFolder}/*"
+      }
+    },
+    {
+      "name": "Launch API (Backend)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-api",
+      "program": "${workspaceFolder}/src/TaskManagement.API/bin/Debug/net9.0/TaskManagement.API.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/TaskManagement.API",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5000"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack (API + Chrome)",
+      "configurations": ["Launch API (Backend)", "Launch Chrome (Frontend)"]
+    }
+  ]
+}

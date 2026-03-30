@@ -1,0 +1,22 @@
+# .NET
+**/bin/
+**/obj/
+**/*.user
+*.db
+*.db-shm
+*.db-wal
+logs/
+*.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# VS / Rider
+.vs/
+.idea/
+*.suo
+*.sln.DotSettings.user
+
+# Secrets — never commit real credentials
+**/appsettings.Production.json

@@ -1,0 +1,10 @@
+<Application x:Class="TaskManagement.Desktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:TaskManagement.Desktop.Converters"
+             Startup="OnStartup">
+    <Application.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <converters:LoadingTextConverter x:Key="LoadingConverter"/>
+    </Application.Resources>
+</Application>
