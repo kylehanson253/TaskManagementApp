@@ -26,17 +26,8 @@ builder.Host.UseSerilog();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Data Source=taskmanagement.db";
 
-// Use SQL Server in production (connection string contains "Server="),
-// fall back to SQLite for local development.
-var isSqlServer = connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
-               || connectionString.Contains("Data Source=tcp:", StringComparison.OrdinalIgnoreCase);
-
-if (isSqlServer)
-    builder.Services.AddDbContext<ApplicationDbContext>(opts =>
-        opts.UseSqlServer(connectionString));
-else
-    builder.Services.AddDbContext<ApplicationDbContext>(opts =>
-        opts.UseSqlite(connectionString));
+builder.Services.AddDbContext<ApplicationDbContext>(opts =>
+    opts.UseSqlite(connectionString));
 
 // ── Repositories & Unit of Work ────────────────────────────────────────────
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -94,14 +85,11 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// ── Apply migrations / seed data ───────────────────────────────────────────
+// ── Apply migrations and seed data ─────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    if (isSqlServer)
-        db.Database.Migrate();      // applies pending EF migrations on Azure SQL
-    else
-        db.Database.EnsureCreated(); // creates SQLite schema on first local run
+    db.Database.EnsureCreated();
 }
 
 // ── Middleware pipeline ────────────────────────────────────────────────────
