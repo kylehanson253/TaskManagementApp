@@ -11,7 +11,9 @@
       "Bash(powershell.exe -Command \"Get-Command node -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
       "Bash(dir /s /b \"C:\\\\Users\\\\Kyle\\\\Documents\\\\TaskManagementApp\\\\*.db\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Kyle\\\\Documents\\\\TaskManagementApp\" -Recurse -Filter \"*.db\")",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(dotnet ef:*)",
+      "Bash(dotnet tool:*)"
     ]
   }
 }

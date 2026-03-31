@@ -12,11 +12,13 @@ public class AuthController : ControllerBase
 
     private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
+    private readonly IWebHostEnvironment _env;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger, IWebHostEnvironment env)
     {
         _authService = authService;
         _logger = logger;
+        _env = env;
     }
 
     /// <summary>Authenticate and receive a JWT access token. Refresh token is set as an httpOnly cookie.</summary>
@@ -86,19 +88,21 @@ public class AuthController : ControllerBase
     }
 
     private void SetRefreshTokenCookie(string token) =>
-        Response.Cookies.Append(RefreshTokenCookie, token, new CookieOptions
-        {
-            HttpOnly = true,
-            SameSite = SameSiteMode.Strict,
-            Expires = DateTimeOffset.UtcNow.AddDays(7),
-            Path = "/"
-        });
+        Response.Cookies.Append(RefreshTokenCookie, token, BuildCookieOptions(DateTimeOffset.UtcNow.AddDays(7)));
 
     private void ClearRefreshTokenCookie() =>
-        Response.Cookies.Delete(RefreshTokenCookie, new CookieOptions
-        {
-            HttpOnly = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/"
-        });
+        Response.Cookies.Delete(RefreshTokenCookie, BuildCookieOptions(DateTimeOffset.UnixEpoch));
+
+    /// <summary>
+    /// Development : SameSite=Strict, Secure=false  (HTTP localhost)
+    /// Production  : SameSite=None,   Secure=true   (HTTPS, works cross-origin through SWA proxy)
+    /// </summary>
+    private CookieOptions BuildCookieOptions(DateTimeOffset expires) => new()
+    {
+        HttpOnly = true,
+        SameSite = _env.IsDevelopment() ? SameSiteMode.Strict : SameSiteMode.None,
+        Secure   = !_env.IsDevelopment(),
+        Expires  = expires,
+        Path     = "/"
+    };
 }

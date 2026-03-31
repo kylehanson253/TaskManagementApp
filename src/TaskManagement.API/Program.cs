@@ -26,8 +26,17 @@ builder.Host.UseSerilog();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Data Source=taskmanagement.db";
 
-builder.Services.AddDbContext<ApplicationDbContext>(opts =>
-    opts.UseSqlite(connectionString));
+// Use SQL Server in production (connection string contains "Server="),
+// fall back to SQLite for local development.
+var isSqlServer = connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase)
+               || connectionString.Contains("Data Source=tcp:", StringComparison.OrdinalIgnoreCase);
+
+if (isSqlServer)
+    builder.Services.AddDbContext<ApplicationDbContext>(opts =>
+        opts.UseSqlServer(connectionString));
+else
+    builder.Services.AddDbContext<ApplicationDbContext>(opts =>
+        opts.UseSqlite(connectionString));
 
 // ── Repositories & Unit of Work ────────────────────────────────────────────
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -66,12 +75,15 @@ builder.Services.AddAuthentication(opts =>
 builder.Services.AddAuthorization();
 
 // ── CORS ───────────────────────────────────────────────────────────────────
+// In production, AllowedOrigins is set via Azure App Service application settings.
+// Locally it falls back to the Vite dev server.
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:5173", "http://localhost:3000"];
+
 builder.Services.AddCors(opts =>
 {
     opts.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins(
-                "http://localhost:5173",  // Vite dev server
-                "http://localhost:3000")
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
@@ -82,11 +94,14 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// ── Apply migrations and seed data ─────────────────────────────────────────
+// ── Apply migrations / seed data ───────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    db.Database.EnsureCreated();
+    if (isSqlServer)
+        db.Database.Migrate();      // applies pending EF migrations on Azure SQL
+    else
+        db.Database.EnsureCreated(); // creates SQLite schema on first local run
 }
 
 // ── Middleware pipeline ────────────────────────────────────────────────────
