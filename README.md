@@ -1,6 +1,6 @@
 # Task Management App
 
-A multi-tenant task management application demonstrating clean architecture across a .NET API, React SPA, and WPF desktop companion.
+A multi-tenant task management application demonstrating clean architecture with a .NET API, React SPA, and WPF desktop companion.
 
 ---
 
@@ -11,7 +11,7 @@ A multi-tenant task management application demonstrating clean architecture acro
 ```bash
 cd src/TaskManagement.API
 dotnet run
-# API listens on http://localhost:5000
+# API listens on http://localhost:5111
 ```
 
 The SQLite database (`taskmanagement.db`) is created automatically on first run with seed data.
@@ -66,7 +66,7 @@ TaskManagementApp/
 
 ### Clean / Layered Architecture
 
-Dependencies flow inward: `API → Application → Core ← Infrastructure → Core`.
+Dependencies flow inward: `API → Application → Core ← Infrastructure`.
 The Core project has no external dependencies.
 
 ---
@@ -79,7 +79,7 @@ is embedded in their JWT claim so it is verified on every request without an ext
 Users cannot access data from other tenants regardless of role.
 
 ### Authentication & Authorization
-- Short-lived JWT access tokens (60 min) + opaque refresh tokens (7 days)
+- Short-lived JWT access tokens (10 minutes that auto refreshes) + opaque refresh tokens (7 days)
 - Two roles: **Admin** and **User**
   - Admins see and manage all tasks and users within their tenant
   - Users see only tasks they created or are assigned to
@@ -88,7 +88,6 @@ Users cannot access data from other tenants regardless of role.
 ### EF Core & Database
 - SQLite chosen for zero-setup simplicity; switching to SQL Server requires only a connection string change and a different `UseSqlite` → `UseSqlServer` call in `Program.cs`
 - Code-first with seed data; `EnsureCreated()` initialises the schema on startup
-- **Optimized query** in `TaskRepository.GetTaskSummaryByTenantAsync`: a single grouped LINQ query translated to efficient SQL (`GROUP BY Status`) — this fulfils the stored-procedure requirement while remaining portable across database providers. In a SQL Server deployment this would be replaced with a stored procedure called via `FromSqlRaw`.
 
 ### Repository & Unit of Work
 The generic `Repository<T>` handles CRUD; specialised repositories (`TaskRepository`, `UserRepository`, etc.) add domain-specific queries. `UnitOfWork` batches all changes into a single `SaveChanges` call, ensuring transactional consistency.
@@ -129,7 +128,7 @@ WHERE "TenantId" = @tenantId
 GROUP BY "Status"
 
 This avoids loading all task rows into memory just to count them — it lets the database do the aggregation work.
-
+ 
 Everything else — Standard EF Core LINQ
 
 ---
@@ -161,6 +160,15 @@ Everything else — Standard EF Core LINQ
 - JWT secret is in `appsettings.json` — in production, read from Azure Key Vault or environment variable `JwtSettings__Secret`.
 
 ---
+
+
+## What to do if there was more time
+- Fix the known issues above
+- Host the api/webpage on Azure for easier demo purposes
+- Add more features: like modifing tasks
+- Separate each tenant into separate schemas or databases, if necessary for tenant isolation
+---
+
 
 ## Bonus: Azure / CI-CD notes
 
