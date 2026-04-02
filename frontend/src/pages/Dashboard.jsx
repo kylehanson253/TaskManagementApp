@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { tasksApi } from '../services/api'
@@ -17,23 +17,25 @@ export default function Dashboard() {
   const navigate = useNavigate()
 
   const [tasks, setTasks] = useState([])
-  const [summary, setSummary] = useState(null)
   const [filter, setFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editingTask, setEditingTask] = useState(null)
   const [showNewModal, setShowNewModal] = useState(false)
 
+  const summary = useMemo(() => ({
+    totalTasks:      tasks.length,
+    todoCount:       tasks.filter(t => t.statusLabel === 'Todo').length,
+    inProgressCount: tasks.filter(t => t.statusLabel === 'InProgress').length,
+    completedCount:  tasks.filter(t => t.statusLabel === 'Completed').length,
+  }), [tasks])
+
   const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const [tasksRes, summaryRes] = await Promise.all([
-        tasksApi.getAll(),
-        tasksApi.getSummary(),
-      ])
-      setTasks(tasksRes.data)
-      setSummary(summaryRes.data)
+      const { data } = await tasksApi.getAll()
+      setTasks(data)
     } catch (err) {
       setError('Failed to load tasks.')
     } finally {
@@ -43,45 +45,39 @@ export default function Dashboard() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await logout()
     navigate('/login')
-  }
+  }, [logout, navigate])
 
-  const handleComplete = async (id) => {
+  const handleComplete = useCallback(async (id) => {
     try {
       const { data } = await tasksApi.complete(id)
       setTasks(prev => prev.map(t => t.id === id ? data : t))
-      const summaryRes = await tasksApi.getSummary()
-      setSummary(summaryRes.data)
     } catch (err) {
       alert(err.response?.data?.error ?? 'Failed to complete task.')
     }
-  }
+  }, [])
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     if (!confirm('Delete this task?')) return
     try {
       await tasksApi.delete(id)
       setTasks(prev => prev.filter(t => t.id !== id))
-      const summaryRes = await tasksApi.getSummary()
-      setSummary(summaryRes.data)
     } catch (err) {
       alert(err.response?.data?.error ?? 'Failed to delete task.')
     }
-  }
+  }, [])
 
-  const handleSaveNew = async (payload) => {
+  const handleSaveNew = useCallback(async (payload) => {
     const { data } = await tasksApi.create(payload)
     setTasks(prev => [data, ...prev])
-    const summaryRes = await tasksApi.getSummary()
-    setSummary(summaryRes.data)
-  }
+  }, [])
 
-  const handleSaveEdit = async (payload) => {
+  const handleSaveEdit = useCallback(async (payload) => {
     const { data } = await tasksApi.update(editingTask.id, payload)
     setTasks(prev => prev.map(t => t.id === data.id ? data : t))
-  }
+  }, [editingTask])
 
   const filteredTasks = filter === 'all'
     ? tasks
@@ -145,7 +141,7 @@ export default function Dashboard() {
         </header>
 
         {/* Summary stats */}
-        {summary && (
+        {!loading && (
           <div className="stats-grid">
             <div className="stat-card">
               <span className="stat-value">{summary.totalTasks}</span>

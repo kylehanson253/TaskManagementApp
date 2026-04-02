@@ -59,7 +59,7 @@ api.interceptors.response.use(
         processQueue(refreshError)
         localStorage.removeItem('token')
         localStorage.removeItem('user')
-        window.location.href = '/login'
+        window.dispatchEvent(new CustomEvent('auth:sessionExpired'))
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false

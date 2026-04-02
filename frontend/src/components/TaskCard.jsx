@@ -38,13 +38,13 @@ export default function TaskCard({ task, onComplete, onEdit, onDelete }) {
         </div>
         <div className="task-card__actions">
           {!isCompleted && (
-            <button className="btn-icon btn-icon--success" title="Mark complete" onClick={() => onComplete(task.id)}>✓</button>
+            <button className="btn-icon btn-icon--success" title="Mark complete" aria-label="Mark complete" onClick={() => onComplete(task.id)}>✓</button>
           )}
           {canEdit && (
-            <button className="btn-icon" title="Edit" onClick={() => onEdit(task)}>✎</button>
+            <button className="btn-icon" title="Edit" aria-label="Edit task" onClick={() => onEdit(task)}>✎</button>
           )}
-          {(isAdmin || task.createdByUserId === user?.id) && (
-            <button className="btn-icon btn-icon--danger" title="Delete" onClick={() => onDelete(task.id)}>✕</button>
+          {canEdit && (
+            <button className="btn-icon btn-icon--danger" title="Delete" aria-label="Delete task" onClick={() => onDelete(task.id)}>✕</button>
           )}
         </div>
       </div>

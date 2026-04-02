@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usersApi } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+
+const FOCUSABLE_SELECTORS =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 const STATUSES = ['Todo', 'InProgress', 'Completed', 'Cancelled']
@@ -18,6 +21,7 @@ export default function TaskModal({ task, onClose, onSave }) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const modalRef = useRef(null)
 
   useEffect(() => {
     if (isAdmin) {
@@ -26,6 +30,41 @@ export default function TaskModal({ task, onClose, onSave }) {
         .catch(() => {})
     }
   }, [isAdmin])
+
+  // Escape to close + focus trap
+  useEffect(() => {
+    const previouslyFocused = document.activeElement
+    const focusable = () => [...modalRef.current?.querySelectorAll(FOCUSABLE_SELECTORS) ?? []]
+
+    // Focus first element on open
+    focusable()[0]?.focus()
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key === 'Tab') {
+        const els = focusable()
+        if (!els.length) { e.preventDefault(); return }
+        const first = els[0]
+        const last  = els[els.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      previouslyFocused?.focus()  // restore focus to trigger element on close
+    }
+  }, [onClose])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -56,7 +95,7 @@ export default function TaskModal({ task, onClose, onSave }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={task ? 'Edit Task' : 'New Task'} ref={modalRef} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{task ? 'Edit Task' : 'New Task'}</h2>
           <button className="btn-icon" onClick={onClose}>✕</button>
@@ -79,7 +118,7 @@ export default function TaskModal({ task, onClose, onSave }) {
             <div className="form-group">
               <label>Priority</label>
               <select name="priority" value={form.priority} onChange={handleChange}>
-                {PRIORITIES.map((p, i) => <option key={i} value={i}>{p}</option>)}
+                {PRIORITIES.map((p, i) => <option key={p} value={i}>{p}</option>)}
               </select>
             </div>
 
@@ -87,7 +126,7 @@ export default function TaskModal({ task, onClose, onSave }) {
               <div className="form-group">
                 <label>Status</label>
                 <select name="status" value={form.status} onChange={handleChange}>
-                  {STATUSES.map((s, i) => <option key={i} value={i}>{s}</option>)}
+                  {STATUSES.map((s, i) => <option key={s} value={i}>{s}</option>)}
                 </select>
               </div>
             )}
